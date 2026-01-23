@@ -32,63 +32,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("error getting request from reader: %w", err)
 		}
-
-
-		formattedRequestLine := fmt.Sprintf(`
-Request line:
-- Method: %s
-- Target: %s
-- Version: %s
-`, 
-req.RequestLine.Method, 
-req.RequestLine.RequestTarget, 
-req.RequestLine.HttpVersion,
-		)
-
-		fmt.Println(formattedRequestLine)
-		
-		// linesCh := getLinesChannel(conn)
-		//
-		// for line := range linesCh {
-		// 	fmt.Println(line)
-		// }
-		// fmt.Println("connection to ", conn.RemoteAddr(), "closed")
+		fmt.Println("Request line:")
+		fmt.Printf("- Method: %s\n", req.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", req.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", req.RequestLine.HttpVersion)
 	}
 }
 
-// func getLinesChannel(f io.ReadCloser) <-chan string {
-// 	linesCh := make(chan string)
-//
-// 	go func() {
-// 		defer f.Close()
-// 		defer close(linesCh)
-//
-// 		currentLine := ""
-// 		for {
-// 			buffer := make([]byte, 8, 8)
-// 			n, err := f.Read(buffer) 
-// 			if err != nil {
-// 				if currentLine != "" {
-// 					linesCh <- currentLine
-// 					currentLine = ""
-// 				}
-// 				if errors.Is(err, io.EOF) {
-// 					return 
-// 				}
-// 				fmt.Printf("error: %s\n", err.Error())
-// 				return
-// 			}
-//
-// 			str := string(buffer[:n])
-// 			parts := strings.Split(str, "\n")
-// 			for i := 0; i < len(parts)-1; i++ {
-// 				linesCh <- fmt.Sprintf("%s%s", currentLine, parts[i])
-// 				currentLine = ""
-// 			}
-// 			currentLine += parts[len(parts)-1]
-// 		}
-// 	}()
-//
-// 	return linesCh
-// }
-//
