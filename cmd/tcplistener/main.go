@@ -30,7 +30,7 @@ func main() {
 
 		req, err := request.RequestFromReader(conn)
 		if err != nil {
-			log.Fatalf("error getting request from reader: %w", err)
+			log.Fatalf("error getting request from reader: %v", err)
 		}
 		fmt.Println("Request line:")
 		fmt.Printf("- Method: %s\n", req.RequestLine.Method)
