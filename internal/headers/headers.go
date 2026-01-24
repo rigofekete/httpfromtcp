@@ -36,8 +36,12 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, fmt.Errorf("invalid character/s found: %s", rawKey)
 	}
 	value := strings.TrimSpace(rawValue)
+	if _, exists := h[key]; exists {
+		h[key] = h[key] + ", " + value
+	} else {
+		h[key] = value
+	}
 
-	h[key] = value
 	return idx + len(crlf), false, nil
 }
 

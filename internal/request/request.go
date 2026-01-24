@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"errors"
+
+	"github.com/rigofekete/httpfromtcp/internal/headers"
 )
 
 type requestState int 
@@ -13,8 +15,8 @@ type requestState int
 const (
 	requestStateInitialized requestState = iota
 	requestStateDone
+	requestStateParsingHeaders
 )
-
 
 type RequestLine struct {
 	HttpVersion   string
@@ -24,40 +26,18 @@ type RequestLine struct {
 
 type Request struct {
 	RequestLine RequestLine
+	Headers headers.Headers
 	state requestState
 }
-
-
-func (r *Request) parse(data []byte) (int, error) {
-	switch r.state {
-	case requestStateInitialized:
-		requestLine, n, err := parseRequestLine(data)
-		if err != nil {
-			return 0, err 
-		}
-		if n == 0 {
-			// needs more data 
-			return 0, nil
-		}
-		r.RequestLine = *requestLine
-		r.state = requestStateDone
-		return n, nil
-	case requestStateDone:
-		return 0, fmt.Errorf("error: trying to read datat in a done state")
-	default:
-		return 0, fmt.Errorf("unknown state")
-	}
-}
-
-const crlf = "\r\n"
-const bufferSize = 8
 
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize, bufferSize) 
 	readToIndex := 0
 	req := &Request {
+		Headers: headers.Headers{},
 		state: requestStateInitialized,
+
 	}
 
 	for req.state != requestStateDone {
@@ -70,7 +50,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		numBytesRead, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				req.state = requestStateDone
+				if req.state != requestStateDone {
+					return nil, fmt.Errorf("incomplete request, in state: %d, read n bytes on EOF: %d", req.state, numBytesRead)
+				}
 				break
 			}
 			return nil, err
@@ -87,6 +69,10 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	}
 	return req, nil
 }
+
+const crlf = "\r\n"
+const bufferSize = 8
+
 
 func parseRequestLine(data []byte) (*RequestLine, int, error) {
 	idx := bytes.Index(data, []byte(crlf))
@@ -136,6 +122,55 @@ func requestLineFromString(str string) (*RequestLine, error) {
 		HttpVersion:   versionParts[1],
 	}, nil
 }
+
+
+func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.state != requestStateDone {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return totalBytesParsed + n, err
+		}
+		totalBytesParsed += n
+		if n == 0 {
+			break
+		}
+	}
+	return totalBytesParsed, nil
+}
+
+
+
+func (r *Request) parseSingle(data []byte) (int, error) {
+	switch r.state {
+	case requestStateInitialized:
+		requestLine, n, err := parseRequestLine(data)
+		if err != nil {
+			return 0, err 
+		}
+		if n == 0 {
+			// needs more data 
+			return 0, nil
+		}
+		r.RequestLine = *requestLine
+		r.state = requestStateParsingHeaders
+		return n, nil
+	case requestStateParsingHeaders:
+		n, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if done {
+			r.state = requestStateDone
+		}
+		return n, nil
+	case requestStateDone:
+		return 0, fmt.Errorf("error: trying to read data in a done state")
+	default:
+		return 0, fmt.Errorf("unknown state")
+	}
+}
+
 
  
 
