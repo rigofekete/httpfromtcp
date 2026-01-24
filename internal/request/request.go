@@ -30,6 +30,7 @@ type Request struct {
 	RequestLine 	RequestLine
 	Headers 	headers.Headers
 	Body 		[]byte
+	bodyLengthRead	int
 	state 		requestState
 }
 
@@ -168,25 +169,25 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		}
 		return n, nil
 	case requestStateParsingBody:
-		value, exist := r.Headers.Get("content-length")
+		contentLenStr, exist := r.Headers.Get("Content-Length")
 		if !exist {
 			r.state = requestStateDone
-			return 0, nil
+			return len(data), nil
 		} 
 
-		valueInt, err := strconv.Atoi(value)
+		contentLen, err := strconv.Atoi(contentLenStr)
 		if err != nil {
-			return 0, fmt.Errorf("Error converting Headers value to int: %v", err)
+			return 0, fmt.Errorf("Error converting Headers contentLenStr to int: %v", err)
 		}
 	
 		r.Body = append(r.Body, data...)
-		if len(r.Body) > valueInt {
-			return 0, fmt.Errorf("Body length is greater that Content-Header: %v", valueInt)
+		r.bodyLengthRead += len(data)
+		if r.bodyLengthRead > contentLen {
+			return 0, fmt.Errorf("Content-Length too large")
 		}
-		if len(r.Body) == valueInt {
+		if r.bodyLengthRead == contentLen {
 			r.state = requestStateDone
-			fmt.Printf("Consumed %d bytes of data for the Body", valueInt)
-			return valueInt, nil  		
+			fmt.Printf("Consumed %d bytes of data for the Body", contentLen)
 		}
 		return len(data), nil  		
 	case requestStateDone:
