@@ -46,6 +46,16 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 }
 
 
+func (h Headers) Get(key string) (string, bool) {
+	value, exist := h[strings.ToLower(key)]	
+	if exist {
+		return value, true
+	}
+	fmt.Printf("Headers map key '%s' does not exist\n", key)
+	return "", false
+}
+
+
 // helpers for field-name character validation to match RFC 9110 guidelines
 var validChars = map[string]struct{}{
 	"!": {},

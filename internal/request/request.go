@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"errors"
+	"strconv"
 
 	"github.com/rigofekete/httpfromtcp/internal/headers"
 )
@@ -16,6 +17,7 @@ const (
 	requestStateInitialized requestState = iota
 	requestStateDone
 	requestStateParsingHeaders
+	requestStateParsingBody
 )
 
 type RequestLine struct {
@@ -25,9 +27,10 @@ type RequestLine struct {
 }
 
 type Request struct {
-	RequestLine RequestLine
-	Headers headers.Headers
-	state requestState
+	RequestLine 	RequestLine
+	Headers 	headers.Headers
+	Body 		[]byte
+	state 		requestState
 }
 
 
@@ -161,9 +164,31 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return 0, err
 		}
 		if done {
-			r.state = requestStateDone
+			r.state = requestStateParsingBody
 		}
 		return n, nil
+	case requestStateParsingBody:
+		value, exist := r.Headers.Get("content-length")
+		if !exist {
+			r.state = requestStateDone
+			return 0, nil
+		} 
+
+		valueInt, err := strconv.Atoi(value)
+		if err != nil {
+			return 0, fmt.Errorf("Error converting Headers value to int: %v", err)
+		}
+	
+		r.Body = append(r.Body, data...)
+		if len(r.Body) > valueInt {
+			return 0, fmt.Errorf("Body length is greater that Content-Header: %v", valueInt)
+		}
+		if len(r.Body) == valueInt {
+			r.state = requestStateDone
+			fmt.Printf("Consumed %d bytes of data for the Body", valueInt)
+			return valueInt, nil  		
+		}
+		return len(data), nil  		
 	case requestStateDone:
 		return 0, fmt.Errorf("error: trying to read data in a done state")
 	default:
