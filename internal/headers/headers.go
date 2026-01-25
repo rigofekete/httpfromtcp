@@ -48,7 +48,6 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	return idx + len(crlf), false, nil
 }
 
-
 func (h Headers) Get(key string) (string, bool) {
 	value, exist := h[strings.ToLower(key)]	
 	if exist {
@@ -56,9 +55,6 @@ func (h Headers) Get(key string) (string, bool) {
 	}
 	fmt.Printf("Headers map key '%s' does not exist\n", key)
 	return "", false
-}
-
-
 }
 
 func (h Headers) Set(key, value string) {

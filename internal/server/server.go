@@ -23,7 +23,7 @@ func Serve(port int) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{ 
+	s := &Server{
 		listener: l,
 	}
 	go s.listen()
@@ -44,19 +44,15 @@ func (s *Server) listen() {
 	}
 }
 
-
-// TODO continue handle refactor
 func (s *Server) handle(conn net.Conn) error {	
 	defer conn.Close()
 	
 	err := response.WriteStatusLine(conn, response.StatusOK)
-	ir err != nil {
+	if err != nil {
 		return err
 	}
-	response.GetDefaultHeaders()
-
-
-	// _, err := conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello World!\n"))
+	headers := response.GetDefaultHeaders(0)
+	err = response.WriteHeaders(conn, headers)
 	if err != nil {
 		return err
 	}

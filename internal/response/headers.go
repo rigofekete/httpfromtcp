@@ -2,21 +2,21 @@ package response
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/rigofekete/httpfromtcp/internal/headers"
 )
 
 func GetDefaultHeaders(contentLen int) headers.Headers {
-	return headers.Headers{
-		"Content-Length": 	fmt.Sprintf("%d", contentLen),
-		"Connection": 		"close",
-		"Content-Type":		"text/plain",
-	}
+	h := headers.NewHeaders()
+	h.Set("Content-Length", fmt.Sprintf("%d", contentLen))
+	h.Set("Connection", "close")
+	h.Set("Content-Type", "text/plain")
+	return h
 }
 
 
 func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	// TODO user headers.Get
 	for k, v := range headers {
 		fieldLine := fmt.Sprintf("%s: %s\r\n", k, v)
 		_, err := w.Write([]byte(fieldLine))
@@ -24,6 +24,7 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 			return err
 		}
 	}
+	_, err := w.Write([]byte("\r\n"))
 	return err
 }
 
