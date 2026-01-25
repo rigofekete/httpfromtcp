@@ -5,12 +5,16 @@ import (
 	"sync/atomic"
 	"log"
 	"fmt"
+
+	"github.com/rigofekete/httpfromtcp/internal/response"
 )
 
 
 type Server struct {
- closed 	atomic.Bool
- listener	net.Listener
+	// closed indicates whether the resource has been closed.
+	// Uses atomic.Bool to allow safe concurrent access from multiple goroutines.
+	closed 	atomic.Bool
+	listener	net.Listener
 }
 
 
@@ -40,9 +44,19 @@ func (s *Server) listen() {
 	}
 }
 
+
+// TODO continue handle refactor
 func (s *Server) handle(conn net.Conn) error {	
 	defer conn.Close()
-	_, err := conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello World!\n"))
+	
+	err := response.WriteStatusLine(conn, response.StatusOK)
+	ir err != nil {
+		return err
+	}
+	response.GetDefaultHeaders()
+
+
+	// _, err := conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello World!\n"))
 	if err != nil {
 		return err
 	}

@@ -28,6 +28,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	rawKey := strings.ToLower(headerLineText[:colonIdx])
 	rawValue := headerLineText[colonIdx+1:]
 
+	// TODO Use headers Set and Get functions instead
 	if rawKey[len(rawKey)-1] == ' ' {
 		return 0, false, fmt.Errorf("malformed Header key: %s", rawKey)
 	}
@@ -35,6 +36,8 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if !checkValidChars(key) {
 		return 0, false, fmt.Errorf("invalid character/s found: %s", rawKey)
 	}
+
+	// TODO Use headers Set and Get functions instead
 	value := strings.TrimSpace(rawValue)
 	if _, exists := h[key]; exists {
 		h[key] = h[key] + ", " + value
@@ -54,6 +57,22 @@ func (h Headers) Get(key string) (string, bool) {
 	fmt.Printf("Headers map key '%s' does not exist\n", key)
 	return "", false
 }
+
+
+}
+
+func (h Headers) Set(key, value string) {
+	key = strings.ToLower(key)
+	v, ok := h[key]
+	if ok {
+		value = strings.Join([]string{
+			v,
+			value,
+		}, ", ")
+	}
+	h[key] = value
+}
+
 
 
 // helpers for field-name character validation to match RFC 9110 guidelines
