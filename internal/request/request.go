@@ -11,7 +11,7 @@ import (
 	"github.com/rigofekete/httpfromtcp/internal/headers"
 )
 
-type requestState int 
+type requestState int
 
 const (
 	requestStateInitialized requestState = iota
@@ -35,61 +35,8 @@ type Request struct {
 }
 
 
-func RequestFromReader(reader io.Reader) (*Request, error) {
-	buf := make([]byte, bufferSize, bufferSize) 
-	readToIndex := 0
-	req := &Request {
-		Headers: headers.Headers{},
-		state: requestStateInitialized,
-
-	}
-
-	for req.state != requestStateDone {
-		if readToIndex >= len(buf) {
-			newBuf := make([]byte, len(buf)*2)
-			copy(newBuf, buf)
-			buf = newBuf
-		}
-	
-		numBytesRead, err := reader.Read(buf[readToIndex:])
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				if req.state != requestStateDone {
-					return nil, fmt.Errorf("incomplete request, in state: %d, read n bytes on EOF: %d", req.state, numBytesRead)
-				}
-				break
-			}
-			return nil, err
-		}
-		readToIndex += numBytesRead
-
-		numBytesParsed, err := req.parse(buf[:readToIndex])
-		if err != nil {
-			return nil, err
-		}
-
-		copy(buf, buf[numBytesParsed:])
-		readToIndex -= numBytesParsed
-	}
-	return req, nil
-}
-
 const crlf = "\r\n"
 const bufferSize = 8
-
-
-func parseRequestLine(data []byte) (*RequestLine, int, error) {
-	idx := bytes.Index(data, []byte(crlf))
-	if idx == -1 {
-		return nil, 0, nil 
-	}
-	requestLineText := string(data[:idx])
-	requestLine, err := requestLineFromString(requestLineText)
-	if err != nil {
-		return nil, 0,  err
-	}
-	return requestLine, idx + len(crlf), nil
-}
 
 func requestLineFromString(str string) (*RequestLine, error) {
 	parts := strings.Split(str, " ")
@@ -128,19 +75,17 @@ func requestLineFromString(str string) (*RequestLine, error) {
 }
 
 
-func (r *Request) parse(data []byte) (int, error) {
-	totalBytesParsed := 0
-	for r.state != requestStateDone {
-		n, err := r.parseSingle(data[totalBytesParsed:])
-		if err != nil {
-			return totalBytesParsed + n, err
-		}
-		totalBytesParsed += n
-		if n == 0 {
-			break
-		}
+func parseRequestLine(data []byte) (*RequestLine, int, error) {
+	idx := bytes.Index(data, []byte(crlf))
+	if idx == -1 {
+		return nil, 0, nil 
 	}
-	return totalBytesParsed, nil
+	requestLineText := string(data[:idx])
+	requestLine, err := requestLineFromString(requestLineText)
+	if err != nil {
+		return nil, 0,  err
+	}
+	return requestLine, idx + len(crlf), nil
 }
 
 
@@ -198,6 +143,59 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 }
 
 
- 
+func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.state != requestStateDone {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return totalBytesParsed + n, err
+		}
+		totalBytesParsed += n
+		if n == 0 {
+			break
+		}
+	}
+	return totalBytesParsed, nil
+}
 
+
+
+func RequestFromReader(reader io.Reader) (*Request, error) {
+	buf := make([]byte, bufferSize, bufferSize)
+	readToIndex := 0
+	req := &Request {
+		Headers: headers.Headers{},
+		state: requestStateInitialized,
+
+	}
+
+	for req.state != requestStateDone {
+		if readToIndex >= len(buf) {
+			newBuf := make([]byte, len(buf)*2)
+			copy(newBuf, buf)
+			buf = newBuf
+		}
+	
+		numBytesRead, err := reader.Read(buf[readToIndex:])
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if req.state != requestStateDone {
+					return nil, fmt.Errorf("incomplete request, in state: %d, read n bytes on EOF: %d", req.state, numBytesRead)
+				}
+				break
+			}
+			return nil, err
+		}
+		readToIndex += numBytesRead
+
+		numBytesParsed, err := req.parse(buf[:readToIndex])
+		if err != nil {
+			return nil, err
+		}
+
+		copy(buf, buf[numBytesParsed:])
+		readToIndex -= numBytesParsed
+	}
+	return req, nil
+}
 

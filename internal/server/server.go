@@ -3,31 +3,37 @@ package server
 import (
 	"net"
 	"sync/atomic"
+	"bytes"
 	"log"
 	"fmt"
 
 	"github.com/rigofekete/httpfromtcp/internal/response"
+	"github.com/rigofekete/httpfromtcp/internal/request"
 )
 
 
+type HandlerError struct {
+	StatusCode response.StatusCode
+	Message string
+}
+
+func (h *HandlerError) Write(conn io.Writer) {
+	response.WriteStatusLine(conn, h.StatusCode)
+	messageBytes := []byte(h.Message)
+	headers := response.GetDefaultHeaders(len(messageBytes))
+	response.WriteHeaders(conn, headers)
+	conn.Write(messageBytes)
+}
+
+type Handler func(w io.Writer, req *request.Request) *HandlerError
+
+// Server is an HTTP 1.1 server
 type Server struct {
 	// closed indicates whether the resource has been closed.
 	// Uses atomic.Bool to allow safe concurrent access from multiple goroutines.
 	closed 	atomic.Bool
 	listener	net.Listener
-}
-
-
-func Serve(port int) (*Server, error) {
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		return nil, err
-	}
-	s := &Server{
-		listener: l,
-	}
-	go s.listen()
-	return s, nil
+	handler	Handler
 }
 
 func (s *Server) listen() {
@@ -44,19 +50,43 @@ func (s *Server) listen() {
 	}
 }
 
-func (s *Server) handle(conn net.Conn) error {	
+func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
-	
-	err := response.WriteStatusLine(conn, response.StatusOK)
+	req, err := request.RequestFromReader(conn)
 	if err != nil {
-		return err
+		hErr := &HandlerError {
+			StatusCode: response.StatusBadRequest,
+			Message: err.Error(),
+		}
+		hErr.Write(conn)
+		return
 	}
-	headers := response.GetDefaultHeaders(0)
-	err = response.WriteHeaders(conn, headers)
+
+	buf := bytes.NewBuffer([]byte{})
+	hErr := s.handler(buf, req)
+	if hErr != nil {
+		hErr.Write(conn)
+		return
+	}
+	b := buf.Bytes()
+	response.WriteStatusLine(conn, response.StatusOK)
+	headers := response.GetDefaultHeaders(len(b))
+	response.WriteHeaders(conn, headers)
+	conn.Write(b)
+	return
+}
+
+func Serve(handler Handler, port int) (*Server, error) {
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	s := &Server{
+		listener: l,
+		handler: handler,
+	}
+	go s.listen()
+	return s, nil
 }
 
 func (s *Server) Close() error {

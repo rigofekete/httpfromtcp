@@ -9,9 +9,9 @@ import (
 type StatusCode int
 
 const (
-	StatusOK 									StatusCode = 200
-	StatusBadRequest					StatusCode = 400
-	StatusInternalServerError	StatusCode = 500
+	StatusOK StatusCode = 200
+	StatusBadRequest StatusCode = 400
+	StatusInternalServerError StatusCode = 500
 )
 
 func GetStatusLine(statusCode StatusCode) []byte {

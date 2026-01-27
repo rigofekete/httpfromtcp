@@ -53,7 +53,7 @@ func (h Headers) Get(key string) (string, bool) {
 	if exist {
 		return value, true
 	}
-	fmt.Printf("Headers map key '%s' does not exist\n", key)
+	// fmt.Printf("Headers map key '%s' does not exist\n", key)
 	return "", false
 }
 

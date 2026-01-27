@@ -5,14 +5,17 @@ import (
 	"os/signal"
 	"syscall"
 	"os"
+	"io"
 
 	"github.com/rigofekete/httpfromtcp/internal/server"
+	"github.com/rigofekete/httpfromtcp/internal/request"
+	"github.com/rigofekete/httpfromtcp/internal/response"
 )
 
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port)
+	server, err := server.Serve(handler, port)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -24,3 +27,22 @@ func main() {
 	<-sigChan
 	log.Println("Server gracefully stopped")
 }
+
+
+func handler(w io.Writer, req *request.Request) *server.HandlerError {
+	handlerResponse := &server.HandlerError{}
+	switch req.RequestLine.RequestTarget {
+	case "/yourproblem":
+		handlerResponse.StatusCode = response.StatusBadRequest
+		handlerResponse.Message = "Your problem is not my problem\n"
+		return handlerResponse
+	case "/myproblem":
+		handlerResponse.StatusCode = response.StatusInternalServerError
+		handlerResponse.Message = "Woopsie, my bad\n"
+		return handlerResponse
+	default:
+		w.Write([]byte("All good, frfr\n"))
+		return nil
+	}
+}
+
