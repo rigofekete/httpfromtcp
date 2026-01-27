@@ -3,7 +3,6 @@ package server
 import (
 	"net"
 	"sync/atomic"
-	"bytes"
 	"log"
 	"fmt"
 
@@ -12,20 +11,7 @@ import (
 )
 
 
-type HandlerError struct {
-	StatusCode response.StatusCode
-	Message string
-}
-
-func (h *HandlerError) Write(conn io.Writer) {
-	response.WriteStatusLine(conn, h.StatusCode)
-	messageBytes := []byte(h.Message)
-	headers := response.GetDefaultHeaders(len(messageBytes))
-	response.WriteHeaders(conn, headers)
-	conn.Write(messageBytes)
-}
-
-type Handler func(w io.Writer, req *request.Request) *HandlerError
+type Handler func(w *response.Writer, req *request.Request)
 
 // Server is an HTTP 1.1 server
 type Server struct {
@@ -50,31 +36,44 @@ func (s *Server) listen() {
 	}
 }
 
+
+
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
+	w := response.NewWriter(conn)
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
-		hErr := &HandlerError {
-			StatusCode: response.StatusBadRequest,
-			Message: err.Error(),
-		}
-		hErr.Write(conn)
+		w.WriteStatusLine(response.StatusBadRequest)
+		body := []byte(fmt.Sprintf("Error parsing request: %v", err))
+		w.WriteHeaders(response.GetDefaultHeaders(len(body)))
+		w.WriteBody(body)
 		return
 	}
-
-	buf := bytes.NewBuffer([]byte{})
-	hErr := s.handler(buf, req)
-	if hErr != nil {
-		hErr.Write(conn)
-		return
-	}
-	b := buf.Bytes()
-	response.WriteStatusLine(conn, response.StatusOK)
-	headers := response.GetDefaultHeaders(len(b))
-	response.WriteHeaders(conn, headers)
-	conn.Write(b)
-	return
+	s.handler(w, req)
 }
+
+
+// func (s *Server) handle(conn net.Conn) {
+// 	defer conn.Close()
+// 	req, err := request.RequestFromReader(conn)
+// 	if err != nil {
+// 		hErr := &HandlerError {
+// 			StatusCode: response.StatusBadRequest,
+// 			Message: err.Error(),
+// 		}
+// 		hErr.Write(conn)
+// 		return
+// 	}
+//
+// 	buf := bytes.NewBuffer([]byte{})
+// 	s.handler(buf, req)
+// 	b := buf.Bytes()
+// 	response.WriteStatusLine(conn, response.StatusOK)
+// 	headers := response.GetDefaultHeaders(len(b))
+// 	response.WriteHeaders(conn, headers)
+// 	conn.Write(b)
+// 	return
+// }
 
 func Serve(handler Handler, port int) (*Server, error) {
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
