@@ -39,6 +39,10 @@ func handler(w *response.Writer, req *request.Request) {
 		handlerProxy(w, req)
 		return
 	}
+	if req.RequestLine.RequestTarget == "/video" {
+		handlerVideo(w, req)
+		return
+	}
 	if req.RequestLine.RequestTarget == "/yourproblem" {
 		handler400(w, req)
 		return
@@ -103,10 +107,28 @@ func handlerProxy(w *response.Writer, req *request.Request) {
 	err = w.WriteTrailers(trailers)
 	if err != nil {
 		fmt.Println("Error writing trailers:", err)
+		return
 	}
 	fmt.Println("Wrote trailers")
 }
 
+const videoFilePath = "assets/vim.mp4"
+
+
+func handlerVideo(w *response.Writer, r *request.Request) {
+	fmt.Printf("Reading data from %s\n", videoFilePath)
+
+	data, err := os.ReadFile(videoFilePath)
+	if err != nil {
+		handler500(w, r)
+		return
+	}
+	w.WriteStatusLine(response.StatusOK)
+	h := response.GetDefaultHeaders(len(data))
+	h.Override("Content-Type", "video/mp4")
+	w.WriteHeaders(h)
+	w.WriteBody(data)
+}
 
 func handler400(w *response.Writer, _ *request.Request) {
 	w.WriteStatusLine(response.StatusBadRequest)
