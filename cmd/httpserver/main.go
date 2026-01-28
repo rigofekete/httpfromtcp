@@ -2,9 +2,13 @@ package main
 
 import (
 	"log"
+	"fmt"
 	"os/signal"
 	"syscall"
+	"io"
 	"os"
+	"net/http"
+	"strings"
 
 	"github.com/rigofekete/httpfromtcp/internal/server"
 	"github.com/rigofekete/httpfromtcp/internal/request"
@@ -29,6 +33,10 @@ func main() {
 
 
 func handler(w *response.Writer, req *request.Request) {
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		handlerProxy(w, req)
+		return
+	}
 	if req.RequestLine.RequestTarget == "/yourproblem" {
 		handler400(w, req)
 		return
@@ -40,6 +48,50 @@ func handler(w *response.Writer, req *request.Request) {
 	handler200(w, req)
 	return
 }
+
+func handlerProxy(w *response.Writer, req *request.Request) {
+	remainingTarget := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
+	url := "https://httpbin.org/" + remainingTarget
+	fmt.Println("Proxying to", url)
+	resp, err := http.Get(url)
+	if err != nil {
+		handler500(w, req)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.WriteStatusLine(response.StatusOK)
+	h := response.GetDefaultHeaders(0)
+	h.Override("Transfer-Encoding", "chunked")
+	h.Remove("Content-Length")
+	w.WriteHeaders(h)
+	
+	const maxChunkSize = 1024
+	buf := make([]byte, maxChunkSize)
+	for {
+		n, err := resp.Body.Read(buf)
+		fmt.Println("Read", n, "bytes")
+		if n > 0 {
+			_, err := w.WriteChunkedBody(buf[:n])
+			if err != nil {
+				fmt.Println("Error writing chunked body:", err)
+				break
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			fmt.Println("Error reading response body:", err)
+			break
+		}
+	}
+	_, err = w.WriteChunkedBodyDone()
+	if err != nil {
+		fmt.Println("Error writing last chunk:", err)
+	}
+}
+
 
 func handler400(w *response.Writer, _ *request.Request) {
 	w.WriteStatusLine(response.StatusBadRequest)
