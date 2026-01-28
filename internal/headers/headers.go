@@ -74,6 +74,10 @@ func (h Headers) Override(key, value string) {
 	h[key] = value
 }
 
+func (h Headers) Remove(key string) {
+	key = strings.ToLower(key)
+	delete(h, key)
+}
 
 // helpers for field-name character validation to match RFC 9110 guidelines
 var validChars = map[string]struct{}{
